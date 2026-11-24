@@ -8,16 +8,14 @@ on:
         description: "URL Download"
         required: true
         type: string
-
       filename:
         description: "Ten file"
         required: true
         type: string
-
       folder:
         description: "Thu muc Google Drive"
-        default: "Downloads"
         required: true
+        default: "Downloads"
         type: string
 
 jobs:
@@ -34,12 +32,13 @@ jobs:
         env:
           CONFIG: ${{ secrets.RCLONE_CONFIG }}
         run: |
-          mkdir -p ~/.config/rclone
-          printf '%s\n' "$CONFIG" > ~/.config/rclone/rclone.conf
-          chmod 600 ~/.config/rclone/rclone.conf
+          mkdir -p "$HOME/.config/rclone"
+          printf '%s\n' "$CONFIG" > "$HOME/.config/rclone/rclone.conf"
+          chmod 600 "$HOME/.config/rclone/rclone.conf"
 
       - name: Test Google Drive
-        run: rclone about gdrive:
+        run: |
+          rclone about "gdrive:"
 
       - name: Download and Upload
         env:
@@ -47,7 +46,9 @@ jobs:
           FILE: ${{ inputs.filename }}
           FOLDER: ${{ inputs.folder }}
         run: |
-          rclone copyurl "$URL" "gdrive:$FOLDER/$FILE" \
+          rclone mkdir "gdrive:${FOLDER}"
+
+          rclone copyurl "$URL" "gdrive:${FOLDER}/${FILE}" \
             --progress \
             --stats 2s \
             --stats-one-line \
@@ -61,8 +62,9 @@ jobs:
         env:
           FOLDER: ${{ inputs.folder }}
         run: |
-          rclone lsl "gdrive:$FOLDER"
+          rclone lsl "gdrive:${FOLDER}"
 
       - name: Cleanup
         if: always()
-        run: rm -f ~/.config/rclone/rclone.conf
+        run: |
+          rm -f "$HOME/.config/rclone/rclone.conf"
