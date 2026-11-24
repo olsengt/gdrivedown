@@ -49,9 +49,10 @@ jobs:
           rclone mkdir "gdrive:${FOLDER}"
 
           rclone copyurl "$URL" "gdrive:${FOLDER}/${FILE}" \
-            --progress \
             --stats 2s \
             --stats-one-line \
+            --stats-one-line-date \
+            --stats-log-level NOTICE \
             --drive-chunk-size 128M \
             --retries 5 \
             --low-level-retries 10 \
