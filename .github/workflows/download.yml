@@ -1,44 +1,7 @@
-
-name: Download URL to Google Drive
-
-on:
-  workflow_dispatch:
-    inputs:
-      url:
-        description: "URL Download"
-        required: true
-        type: string
-      filename:
-        description: "Ten file"
-        required: true
-        type: string
-      folder:
-        description: "Thu muc Google Drive"
-        required: true
-        default: "Downloads"
-        type: string
-
-jobs:
-  download:
-    runs-on: ubuntu-latest
-    timeout-minutes: 360
-
-    steps:
-      - name: Install Rclone
+      - name: Install Aria2
         run: |
-          curl -fsSL https://rclone.org/install.sh | sudo bash
-
-      - name: Configure Rclone
-        env:
-          CONFIG: ${{ secrets.RCLONE_CONFIG }}
-        run: |
-          mkdir -p "$HOME/.config/rclone"
-          printf '%s\n' "$CONFIG" > "$HOME/.config/rclone/rclone.conf"
-          chmod 600 "$HOME/.config/rclone/rclone.conf"
-
-      - name: Test Google Drive
-        run: |
-          rclone about "gdrive:"
+          sudo apt-get update
+          sudo apt-get install -y aria2
 
       - name: Download and Upload
         env:
@@ -46,26 +9,33 @@ jobs:
           FILE: ${{ inputs.filename }}
           FOLDER: ${{ inputs.folder }}
         run: |
-          rclone mkdir "gdrive:${FOLDER}"
+          set -e
 
-          rclone copyurl "$URL" "gdrive:${FOLDER}/${FILE}" \
+          mkdir -p /tmp/downloads
+          df -h /tmp
+
+          aria2c \
+            -x 16 \
+            -s 16 \
+            -k 1M \
+            -c \
+            --max-tries=10 \
+            --retry-wait=3 \
+            --file-allocation=none \
+            --summary-interval=2 \
+            --console-log-level=notice \
+            --download-result=full \
+            --dir=/tmp/downloads \
+            --out="$FILE" \
+            "$URL"
+
+          rclone copyto \
+            "/tmp/downloads/$FILE" \
+            "gdrive:$FOLDER/$FILE" \
+            --drive-chunk-size 128M \
             --stats 2s \
             --stats-one-line \
-            --stats-one-line-date \
             --stats-log-level NOTICE \
-            --drive-chunk-size 128M \
-            --retries 5 \
-            --low-level-retries 10 \
-            --contimeout 30s \
-            --timeout 5m
+            --retries 5
 
-      - name: Verify File
-        env:
-          FOLDER: ${{ inputs.folder }}
-        run: |
-          rclone lsl "gdrive:${FOLDER}"
-
-      - name: Cleanup
-        if: always()
-        run: |
-          rm -f "$HOME/.config/rclone/rclone.conf"
+          rm -f "/tmp/downloads/$FILE"
